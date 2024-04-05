@@ -1,0 +1,16 @@
+node_modules
+
+/.cache
+/build
+/public/build
+.env
+
+.DS_Store
+**/.DS_Store
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/coverage
+
+# avoid pollution from IntelliJ-based IDE
+.idea
