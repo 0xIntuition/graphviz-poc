@@ -5,6 +5,7 @@
 ## Structure
 
 - [crates](./crates/) - rust crates
+  - [bevy-graph-view](./crates/bevy-graph-view/) - the main graph view 
 - [packages](./packages/) - npm packages
   - [wasm-graph-view](/packages/wasm-graph-view/) 
 - [web](./web/) - intuition starter template (todo)
