@@ -6,7 +6,9 @@
 
 - [crates](./crates/) - rust crates
 - [packages](./packages/) - npm packages
-- [web](./web/) - remix website
+  - [wasm-graph-view](/packages/wasm-graph-view/) 
+- [web](./web/) - intuition starter template (todo)
+- [web-vite](./web-vite/) - vanilla vite website
 - [mobile](./mobile/) - react native mobile app
 
 
