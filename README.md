@@ -10,6 +10,7 @@
   - [wasm-graph-view](/packages/wasm-graph-view/) 
 - [web](./web/) - intuition starter template (todo)
 - [web-vite](./web-vite/) - vanilla vite website
-- [mobile-rn](./mobile-rn/) - react native mobile app
+- [mobile-rn](./mobile-rn/) - react native mobile app (todo)
+- [mobile](./mobile/) - ios mobile app 
 
 
