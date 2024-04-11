@@ -2088,6 +2088,8 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy-graph-view",
+ "objc",
+ "raw-window-handle",
 ]
 
 [[package]]
