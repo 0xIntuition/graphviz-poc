@@ -13,8 +13,11 @@ crate-type = ["staticlib", "cdylib"]
 [dependencies]
 bevy = "0.13.2" 
 bevy-graph-view = { path = "../crates/bevy-graph-view" }
+raw_window_handle = { package = "raw-window-handle", version = "0.6" }
+objc = "0.2.7"
 
 [package.metadata.android]
+
 package = "systems.intuition.mobile"
 apk_name = "intuition"
 assets = "./assets"
