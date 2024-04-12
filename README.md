@@ -11,6 +11,7 @@
 - [web](./web/) - intuition starter template (todo)
 - [web-vite](./web-vite/) - vanilla vite website
 - [mobile-rn](./mobile-rn/) - react native mobile app (todo)
+- [mobile-custom-rn](./mobile-custom-rn/) - custom react native mobile app (todo, broken)
 - [mobile](./mobile/) - ios mobile app 
 
 
