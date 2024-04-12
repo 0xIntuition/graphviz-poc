@@ -14,6 +14,7 @@
 		55B7188F81C3C4183F81D3AE /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A39528EB2CCB182F5328223A /* libc++.tbd */; };
 		57CD6306253C7A940098CD4A /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57CD6305253C7A940098CD4A /* AudioToolbox.framework */; };
 		57CD630E253C80EC0098CD4A /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 57CD630A253C7F5F0098CD4A /* assets */; };
+		706710FE2BC87305002BBA29 /* HelloWorldViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 706710FD2BC87305002BBA29 /* HelloWorldViewController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,8 @@
 		55EAC02897847195D2F44C15 /* intuition_mobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = intuition_mobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		57CD6305253C7A940098CD4A /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		57CD630A253C7F5F0098CD4A /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../assets; sourceTree = "<group>"; };
+		706710FC2BC87305002BBA29 /* HelloWorldViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HelloWorldViewController.h; sourceTree = "<group>"; };
+		706710FD2BC87305002BBA29 /* HelloWorldViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HelloWorldViewController.m; sourceTree = "<group>"; };
 		8EE7F1E3B0303533925D7E33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		96A1E5B62F48B379829E8A0D /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		9F1B41978FA53999AA836D0F /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
@@ -70,6 +73,8 @@
 				160DB77300A3F1806F024D47 /* bindings.h */,
 				8EE7F1E3B0303533925D7E33 /* Info.plist */,
 				AF7DE91055EBD05ED77E57F9 /* main.m */,
+				706710FC2BC87305002BBA29 /* HelloWorldViewController.h */,
+				706710FD2BC87305002BBA29 /* HelloWorldViewController.m */,
 			);
 			path = "ios-src";
 			sourceTree = "<group>";
@@ -175,6 +180,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				706710FE2BC87305002BBA29 /* HelloWorldViewController.m in Sources */,
 				55892F1396056740E1AF9685 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
