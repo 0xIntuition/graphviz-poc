@@ -12,3 +12,13 @@ pub fn random_point_on_sphere_surface(radius: f32) -> (f32, f32, f32) {
 
     (x, y, z)
 }
+
+pub fn normalize(vec: &mut [f32]) {
+    let min = vec.iter().cloned().fold(f32::INFINITY, f32::min);
+    let max = vec.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+
+    if max - min != 0.0 {
+        vec.iter_mut()
+            .for_each(|x| *x = 1.0 + (*x - min) / (max - min));
+    }
+}

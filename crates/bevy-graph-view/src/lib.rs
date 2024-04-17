@@ -1,8 +1,20 @@
 mod assets;
+mod components;
+mod events;
+mod graph;
+mod resources;
 mod utils;
 
+use crate::resources::EdgeType;
 use assets::{AssetsPlugin, MyAssets};
 use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*, render::camera::ScalingMode};
+use events::{AddGraphIdentifiers, EventsPlugin};
+use graph::GraphPlugin;
+use resources::{Edge, Graph, Node, ResourcesPlugin};
+
+use rand::Rng;
+use std::u32::MAX;
+
 pub struct GraphViewPlugin;
 
 #[derive(Component)]
@@ -11,7 +23,10 @@ struct Group;
 impl Plugin for GraphViewPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(AssetsPlugin)
-            .add_systems(Startup, setup)
+            .add_plugins(ResourcesPlugin)
+            .add_plugins(EventsPlugin)
+            .add_plugins(GraphPlugin)
+            .add_systems(Startup, (setup, add_test_data))
             .add_systems(Update, rotate_system);
     }
 }
@@ -61,4 +76,39 @@ fn setup(mut commands: Commands, my_assets: ResMut<MyAssets>) {
             .looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     },));
+}
+
+fn add_test_data(mut graph: ResMut<Graph>, mut ev: EventWriter<AddGraphIdentifiers>) {
+    const NODES: usize = 100;
+    const EDGES: usize = 100;
+    let nodes = graph.nodes.len();
+
+    for i in 0..NODES {
+        let index = nodes + i as usize;
+        graph.nodes.push(Node {
+            id: format!("did:example:{}", index),
+            label: format!("Node {}", index),
+            ..Default::default()
+        });
+    }
+
+    for _ in 0..EDGES {
+        let all_node_ids: Vec<String> = graph.nodes.iter().map(|node| node.id.clone()).collect();
+        let from = all_node_ids
+            .iter()
+            .nth(rand::thread_rng().gen_range(0..all_node_ids.len()))
+            .unwrap();
+        let to = all_node_ids
+            .iter()
+            .filter(|id| id != &from)
+            .nth(rand::thread_rng().gen_range(0..(all_node_ids.len() - 1)))
+            .unwrap();
+        graph.edges.push(Edge {
+            id: format!("did:connection:{}", rand::thread_rng().gen_range(0..MAX)),
+            from: from.clone(),
+            to: to.clone(),
+            edge_type: EdgeType::Unspecified,
+        });
+    }
+    ev.send(AddGraphIdentifiers);
 }
