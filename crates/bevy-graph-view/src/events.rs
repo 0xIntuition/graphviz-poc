@@ -43,9 +43,9 @@ pub enum LayoutType {
 impl Default for LayoutSettings {
     fn default() -> Self {
         Self {
-            gravity: 1.25,
+            gravity: 0.1,
             attraction: 1.0,
-            repulsion: 0.05,
+            repulsion: 0.01,
             speed: 0.1,
             layout_type: LayoutType::Sphere,
         }

@@ -21,6 +21,7 @@ impl Plugin for GraphPlugin {
         app.add_systems(Update, update_labels.after(update_identifiers))
             .add_systems(Update, select_node)
             .add_systems(Update, select_edge)
+            .add_systems(Update, update_connections_transforms)
             .add_systems(Update, update_identifiers.before(update_labels))
             .add_systems(Update, update_layout);
     }
@@ -255,6 +256,7 @@ fn update_layout(
     mut keys: Local<Vec<String>>,
     mut layout_type: Local<LayoutType>,
     mut cloned_ranks: Local<Vec<f32>>,
+    configuration: Res<Configuration>,
     mut commands: Commands,
     mut ev: EventReader<LayoutEvent>,
     identifier_query: Query<(Entity, &Transform, &Identifier), With<Identifier>>,
@@ -307,7 +309,7 @@ fn update_layout(
 
         let masses_sizes = cloned_ranks
             .iter()
-            .map(|rank| (1.0, *rank))
+            .map(|rank| (1.0, 1.0))
             .collect::<Vec<_>>();
         *layout = Some(Layout::<f32, 3>::from_graph_with_masses(
             edges,
@@ -331,12 +333,21 @@ fn update_layout(
         Some(ref mut layout) => {
             layout.iteration();
 
+            let max_distance = layout
+                .nodes
+                .iter()
+                .map(|node| {
+                    (node.pos.x().powi(2) + node.pos.y().powi(2) + node.pos.z().powi(2)).sqrt()
+                })
+                .fold(0.0, f32::max);
+            let scale = configuration.container_size / max_distance;
+
             for (index, node) in layout.nodes.iter().enumerate() {
-                let x = node.pos.x();
-                let y = node.pos.y();
+                let x = node.pos.x() * scale;
+                let y = node.pos.y() * scale;
                 let z = match *layout_type {
                     LayoutType::Flat => 0.0,
-                    LayoutType::Sphere => node.pos.z(),
+                    LayoutType::Sphere => node.pos.z() * scale,
                 };
 
                 let id = keys[index].clone();
@@ -345,22 +356,38 @@ fn update_layout(
                     .find(|(_, _, identifier)| identifier.id == id)
                 {
                     commands.entity(entity).insert(
-                        Transform::from_xyz(x, y, z)
-                            .with_scale(Vec3::ONE * cloned_ranks[index] * 1.1 + 0.5),
-                        // transform.ease_to(
-                        //     Transform::from_xyz(x, y, z)
-                        //         .with_scale(Vec3::ONE * cloned_ranks[index] * 1.1 + 0.5),
-                        //     EaseFunction::QuarticOut,
-                        //     bevy_easings::EasingType::Once {
-                        //         duration: (std::time::Duration::from_secs(
-                        //             configuration.animation_duration,
-                        //         )),
-                        //     },
-                        // ),
+                        Transform::from_xyz(x, y, z).with_scale(Vec3::ONE),
+                        // .with_scale(Vec3::ONE * cloned_ranks[index] * 1.1 + 0.5),
                     );
                 }
             }
         }
         None => {}
+    }
+}
+
+fn update_connections_transforms(
+    mut conn_query: Query<(&mut Transform, &Connection), (With<Connection>, Without<Identifier>)>,
+    id_query: Query<&Transform, (With<Identifier>, Without<Connection>)>,
+) {
+    for (mut transform, connection) in conn_query.iter_mut() {
+        if let Ok(from_transform) = id_query.get(connection.from) {
+            if let Ok(to_transform) = id_query.get(connection.to) {
+                let mid_point = from_transform
+                    .translation
+                    .lerp(to_transform.translation, 0.5);
+                let distance = from_transform
+                    .translation
+                    .distance(to_transform.translation);
+                let rotation = Quat::from_rotation_arc(
+                    Vec3::Y,
+                    (to_transform.translation - from_transform.translation).normalize(),
+                );
+
+                *transform = Transform::from_xyz(mid_point.x, mid_point.y, mid_point.z)
+                    .with_rotation(rotation)
+                    .with_scale(Vec3::new(1.0, distance, 1.0));
+            }
+        }
     }
 }
