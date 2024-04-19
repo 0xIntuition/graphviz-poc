@@ -42,8 +42,8 @@ fn add_test_data(
     mut ev: EventWriter<AddGraphIdentifiers>,
     mut ev_l: EventWriter<LayoutEvent>,
 ) {
-    const NODES: usize = 100;
-    const EDGES: usize = 100;
+    const NODES: usize = 600;
+    const EDGES: usize = 600;
     let nodes = graph.nodes.len();
 
     for i in 0..NODES {
@@ -76,7 +76,7 @@ fn add_test_data(
     ev.send(AddGraphIdentifiers);
     ev_l.send(LayoutEvent {
         atlas_settings: Default::default(),
-        speed: 0.1,
+        speed: 0.6,
         // layout_type: events::LayoutType::Flat,
         layout_type: Default::default(),
         page_rank_config: Default::default(),

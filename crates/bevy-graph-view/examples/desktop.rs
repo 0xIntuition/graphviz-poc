@@ -15,7 +15,7 @@ fn setup(
     // mut meshes: ResMut<Assets<Mesh>>,
     // mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let initial_camera_location = Vec3::new(-2.0, 2.5, 5.0);
+    let initial_camera_location = Vec3::new(-2.0, 2.5, 9.0);
 
     commands.spawn((
         Camera3dBundle {
