@@ -331,8 +331,9 @@ fn update_layout(
 
     match *layout {
         Some(ref mut layout) => {
-            layout.iteration();
-
+            for _ in 0..5 {
+                layout.iteration();
+            }
             let max_distance = layout
                 .nodes
                 .iter()
