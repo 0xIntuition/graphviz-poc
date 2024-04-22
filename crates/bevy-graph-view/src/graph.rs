@@ -21,8 +21,9 @@ impl Plugin for GraphPlugin {
         app.add_systems(Update, update_labels.after(update_identifiers))
             .add_systems(Update, select_node)
             .add_systems(Update, select_edge)
-            .add_systems(Update, update_connections_transforms)
+            .add_systems(Update, update_graph_edge_transforms)
             .add_systems(Update, update_identifiers.before(update_labels))
+            // .add_systems(Update, update_graph_node_transforms);
             .add_systems(Update, update_layout);
     }
 }
@@ -58,8 +59,8 @@ fn update_labels(
     mut labels: Query<(Entity, &mut Style, &ExampleLabel), With<ExampleLabel>>,
     labelled: Query<&GlobalTransform>,
     graph: Res<Graph>,
-    identifier_query: Query<&Identifier, With<Identifier>>,
-    conn_query: Query<&Connection, With<Connection>>,
+    identifier_query: Query<&GraphNode, With<GraphNode>>,
+    conn_query: Query<&GraphEdge, With<GraphEdge>>,
 ) {
     let (camera, _, camera_global_transform) = camera.single_mut();
     for (entity, mut style, label) in &mut labels {
@@ -113,8 +114,8 @@ fn update_identifiers(
     configuration: Res<Configuration>,
     my_assets: ResMut<MyAssets>,
     graph: Res<Graph>,
-    conn_query: Query<Entity, With<Connection>>,
-    identifier_query: Query<Entity, With<Identifier>>,
+    conn_query: Query<Entity, With<GraphEdge>>,
+    identifier_query: Query<Entity, With<GraphNode>>,
     label_query: Query<Entity, With<ExampleLabel>>,
 ) {
     let label_text_style = TextStyle {
@@ -144,8 +145,9 @@ fn update_identifiers(
 
                         ..Default::default()
                     },
-                    Identifier {
+                    GraphNode {
                         id: node.id.clone(),
+                        mass: 1.0,
                     },
                     PickableBundle::default(),
                     On::<Pointer<Click>>::run(
@@ -184,8 +186,8 @@ fn update_identifiers(
         }
 
         for edge in &graph.edges {
-            if let Some((from, x1, y1, z1)) = node_coordinates.get(&edge.from).cloned() {
-                if let Some((to, x2, y2, z2)) = node_coordinates.get(&edge.to).cloned() {
+            if let Some((source, x1, y1, z1)) = node_coordinates.get(&edge.from).cloned() {
+                if let Some((target, x2, y2, z2)) = node_coordinates.get(&edge.to).cloned() {
                     let transform1 = Transform::from_xyz(x1, y1, z1);
                     let transform2 = Transform::from_xyz(x2, y2, z2);
 
@@ -212,10 +214,11 @@ fn update_identifiers(
 
                                 ..Default::default()
                             },
-                            Connection {
+                            GraphEdge {
                                 id: edge.id.clone(),
-                                from,
-                                to,
+                                source,
+                                target,
+                                strength: 1.0,
                             },
                         ))
                         .id();
@@ -259,7 +262,7 @@ fn update_layout(
     configuration: Res<Configuration>,
     mut commands: Commands,
     mut ev: EventReader<LayoutEvent>,
-    identifier_query: Query<(Entity, &Transform, &Identifier), With<Identifier>>,
+    identifier_query: Query<(Entity, &Transform, &GraphNode), With<GraphNode>>,
     graph: Res<Graph>,
 ) {
     for settings in ev.read() {
@@ -367,22 +370,91 @@ fn update_layout(
     }
 }
 
-fn update_connections_transforms(
-    mut conn_query: Query<(&mut Transform, &Connection), (With<Connection>, Without<Identifier>)>,
-    id_query: Query<&Transform, (With<Identifier>, Without<Connection>)>,
+fn update_graph_node_transforms(
+    mut node_query: Query<
+        (Entity, &mut Transform, &GraphNode),
+        (With<GraphNode>, Without<GraphEdge>),
+    >,
+    mut edge_query: Query<(&mut Transform, &GraphEdge), (With<GraphEdge>, Without<GraphNode>)>,
+    configuration: Res<Configuration>,
 ) {
-    for (mut transform, connection) in conn_query.iter_mut() {
-        if let Ok(from_transform) = id_query.get(connection.from) {
-            if let Ok(to_transform) = id_query.get(connection.to) {
-                let mid_point = from_transform
+    const MAX_DISTANCE: f32 = 5.0;
+    let mut combinations = node_query.iter_combinations_mut();
+    while let Some([mut node1, mut node2]) = combinations.fetch_next() {
+        //apply repulsion
+        let distance = node1.1.translation.distance(node2.1.translation);
+
+        // if distance > MAX_DISTANCE {
+        //     continue;
+        // }
+        let direction = node1.1.translation - node2.1.translation;
+
+        // gravity to the center
+        let center = Vec3::ZERO;
+        let center_force1 = (center - node1.1.translation).normalize() * 0.01;
+        let center_force2 = (center - node2.1.translation).normalize() * 0.01;
+        node1.1.translation += center_force1;
+        node2.1.translation += center_force2;
+
+        let force = direction.normalize() * 0.1 / distance;
+
+        node1.1.translation += force;
+        node2.1.translation -= force;
+
+        node1.1.translation = node1.1.translation.clamp(
+            Vec3::NEG_ONE * configuration.container_size,
+            Vec3::ONE * configuration.container_size,
+        );
+
+        node2.1.translation = node2.1.translation.clamp(
+            Vec3::NEG_ONE * configuration.container_size,
+            Vec3::ONE * configuration.container_size,
+        );
+    }
+
+    const MIN_DISTANCE: f32 = 0.3;
+    for (mut edge_transform, graph_edge) in edge_query.iter_mut() {
+        let [mut source, mut target] = node_query
+            .get_many_mut([graph_edge.source, graph_edge.target])
+            .unwrap();
+
+        //apply attraction
+        let distance = source.1.translation.distance(target.1.translation);
+        if distance > MIN_DISTANCE {
+            let direction = target.1.translation - source.1.translation;
+            let force = direction.normalize() * 0.1 * (distance);
+            source.1.translation += force;
+            target.1.translation -= force;
+
+            source.1.translation = source.1.translation.clamp(
+                Vec3::NEG_ONE * configuration.container_size,
+                Vec3::ONE * configuration.container_size,
+            );
+
+            target.1.translation = target.1.translation.clamp(
+                Vec3::NEG_ONE * configuration.container_size,
+                Vec3::ONE * configuration.container_size,
+            );
+        }
+    }
+}
+
+fn update_graph_edge_transforms(
+    mut edge_query: Query<(&mut Transform, &GraphEdge), (With<GraphEdge>, Without<GraphNode>)>,
+    node_query: Query<&Transform, (With<GraphNode>, Without<GraphEdge>)>,
+) {
+    for (mut transform, graph_edge) in edge_query.iter_mut() {
+        if let Ok(source_transform) = node_query.get(graph_edge.source) {
+            if let Ok(target_transform) = node_query.get(graph_edge.target) {
+                let mid_point = source_transform
                     .translation
-                    .lerp(to_transform.translation, 0.5);
-                let distance = from_transform
+                    .lerp(target_transform.translation, 0.5);
+                let distance = source_transform
                     .translation
-                    .distance(to_transform.translation);
+                    .distance(target_transform.translation);
                 let rotation = Quat::from_rotation_arc(
                     Vec3::Y,
-                    (to_transform.translation - from_transform.translation).normalize(),
+                    (target_transform.translation - source_transform.translation).normalize(),
                 );
 
                 *transform = Transform::from_xyz(mid_point.x, mid_point.y, mid_point.z)

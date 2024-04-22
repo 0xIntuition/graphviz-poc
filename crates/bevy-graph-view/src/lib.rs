@@ -42,8 +42,8 @@ fn add_test_data(
     mut ev: EventWriter<AddGraphIdentifiers>,
     mut ev_l: EventWriter<LayoutEvent>,
 ) {
-    const NODES: usize = 600;
-    const EDGES: usize = 600;
+    const NODES: usize = 500;
+    const EDGES: usize = 500;
     let nodes = graph.nodes.len();
 
     for i in 0..NODES {
