@@ -3,10 +3,7 @@ use crate::components::*;
 use crate::events::*;
 use crate::resources::*;
 use crate::utils::random_point_on_circle_surface;
-use crate::utils::random_point_on_sphere_surface;
 use bevy::prelude::*;
-use bevy_mod_picking::prelude::*;
-use bevy_mod_picking::PickableBundle;
 use forceatlas2::Settings;
 use std::collections::HashMap;
 
@@ -14,15 +11,20 @@ pub struct GraphPlugin;
 
 impl Plugin for GraphPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_labels.after(update_identifiers))
-            .add_systems(Update, select_node)
+        app.add_systems(Update, select_node)
             .add_systems(Update, select_edge)
             .add_systems(Update, update_graph_edge_transforms)
-            .add_systems(Update, update_identifiers.before(update_labels))
+            // .add_systems(Update, update_identifiers)
             // .add_systems(Update, update_graph_node_transforms);
-            .add_systems(Update, handle_add_graph_nodes_edges_event)
+            .add_systems(
+                Update,
+                handle_add_graph_nodes_edges_event.before(update_layout),
+            )
             .add_systems(Update, handle_layout_settings_event)
-            .add_systems(Update, update_layout);
+            .add_systems(
+                Update,
+                update_layout.after(handle_add_graph_nodes_edges_event),
+            );
     }
 }
 
@@ -44,210 +46,6 @@ pub fn select_edge(mut graph: ResMut<Graph>, mut ev: EventReader<SelectEdgeEvent
             graph.selected_edges.retain(|x| x != edge_id);
         } else {
             graph.selected_edges.push(edge_id.clone());
-        }
-    }
-}
-#[derive(Component)]
-struct ExampleLabel {
-    entity: Entity,
-}
-fn update_labels(
-    mut camera: Query<(&mut Camera, &mut Transform, &GlobalTransform), With<Camera3d>>,
-    mut commands: Commands,
-    mut labels: Query<(Entity, &mut Style, &ExampleLabel), With<ExampleLabel>>,
-    labelled: Query<&GlobalTransform>,
-    graph: Res<Graph>,
-    identifier_query: Query<&GraphNode, With<GraphNode>>,
-    conn_query: Query<&GraphEdge, With<GraphEdge>>,
-) {
-    let (camera, _, camera_global_transform) = camera.single_mut();
-    for (entity, mut style, label) in &mut labels {
-        if let Ok(labelled_component) = labelled.get(label.entity) {
-            let world_position = labelled_component.translation();
-
-            let viewport_position =
-                camera.world_to_viewport(camera_global_transform, world_position);
-
-            match viewport_position {
-                Some(viewport_position) => {
-                    style.top = Val::Px(viewport_position.y);
-                    style.left = Val::Px(viewport_position.x);
-                }
-                None => {
-                    // style.top = Val::Px(0.0);
-                    // style.left = Val::Px(0.0);
-                }
-            }
-
-            let identifier = identifier_query.get(label.entity);
-            match identifier {
-                Ok(identifier) => {
-                    if graph.selected_nodes.contains(&identifier.id) {
-                        commands.entity(entity).insert(Visibility::Visible);
-                    } else {
-                        commands.entity(entity).insert(Visibility::Hidden);
-                    }
-                }
-                Err(_) => {}
-            }
-
-            let connection = conn_query.get(label.entity);
-            match connection {
-                Ok(connection) => {
-                    if graph.selected_edges.contains(&connection.id) {
-                        commands.entity(entity).insert(Visibility::Visible);
-                    } else {
-                        commands.entity(entity).insert(Visibility::Hidden);
-                    }
-                }
-                Err(_) => {}
-            }
-        }
-    }
-}
-
-fn update_identifiers(
-    mut commands: Commands,
-    mut ev: EventReader<AddGraphIdentifiers>,
-    configuration: Res<Configuration>,
-    my_assets: ResMut<MyAssets>,
-    graph: Res<Graph>,
-    conn_query: Query<Entity, With<GraphEdge>>,
-    identifier_query: Query<Entity, With<GraphNode>>,
-    label_query: Query<Entity, With<ExampleLabel>>,
-) {
-    let label_text_style = TextStyle {
-        ..Default::default()
-    };
-    for _ in ev.read() {
-        for entity in conn_query.iter() {
-            commands.entity(entity).despawn();
-        }
-
-        for entity in identifier_query.iter() {
-            commands.entity(entity).despawn();
-        }
-        for entity in label_query.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
-        let mut node_coordinates: HashMap<String, (Entity, f32, f32, f32)> = HashMap::new();
-        for node in &graph.nodes {
-            let (x, y, z) = random_point_on_sphere_surface(configuration.container_size);
-            let entity = commands
-                .spawn((
-                    MaterialMeshBundle {
-                        mesh: my_assets.identifier_mesh_handle.clone(),
-                        material: my_assets.identifier_material_handle.clone(),
-                        transform: Transform::from_xyz(x, y, z)
-                            .with_scale(Vec3::new(0.5, 0.5, 0.5)),
-
-                        ..Default::default()
-                    },
-                    GraphNode {
-                        id: node.id.clone(),
-                        mass: 1.0,
-                    },
-                    PickableBundle::default(),
-                    On::<Pointer<Click>>::run(
-                        |event: Listener<Pointer<Click>>,
-                         mut ev: EventWriter<SelectIdentifierEvent>| {
-                            info!("The pointer clicked entity {:?}", event.target);
-                            ev.send(SelectIdentifierEvent(event.target));
-                        },
-                    ),
-                ))
-                .id();
-            commands
-                .spawn((
-                    NodeBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            ..default()
-                        },
-                        ..default()
-                    },
-                    ExampleLabel { entity },
-                ))
-                .with_children(|parent| {
-                    parent.spawn(
-                        TextBundle::from_section(node.label.clone(), label_text_style.clone())
-                            .with_style(Style {
-                                position_type: PositionType::Absolute,
-                                bottom: Val::ZERO,
-                                ..default()
-                            })
-                            .with_no_wrap(),
-                    );
-                });
-
-            node_coordinates.insert(node.id.clone(), (entity, x, y, z));
-        }
-
-        for edge in &graph.edges {
-            if let Some((source, x1, y1, z1)) = node_coordinates.get(&edge.from).cloned() {
-                if let Some((target, x2, y2, z2)) = node_coordinates.get(&edge.to).cloned() {
-                    let transform1 = Transform::from_xyz(x1, y1, z1);
-                    let transform2 = Transform::from_xyz(x2, y2, z2);
-
-                    let mid_point = transform1.translation.lerp(transform2.translation, 0.5);
-                    let distance = transform1.translation.distance(transform2.translation);
-                    let rotation = Quat::from_rotation_arc(
-                        Vec3::Y,
-                        (transform2.translation - transform1.translation).normalize(),
-                    );
-
-                    let entity = commands
-                        .spawn((
-                            MaterialMeshBundle {
-                                mesh: my_assets.connection_mesh_handle.clone(),
-                                material: my_assets.connection_material_handle.clone(),
-                                visibility: Visibility::Visible,
-                                transform: Transform::from_xyz(
-                                    mid_point.x,
-                                    mid_point.y,
-                                    mid_point.z,
-                                )
-                                .with_rotation(rotation)
-                                .with_scale(Vec3::new(1.0, distance, 1.0)),
-
-                                ..Default::default()
-                            },
-                            GraphEdge {
-                                id: edge.id.clone(),
-                                source,
-                                target,
-                                strength: 1.0,
-                            },
-                        ))
-                        .id();
-                    commands
-                        .spawn((
-                            NodeBundle {
-                                style: Style {
-                                    position_type: PositionType::Absolute,
-                                    ..default()
-                                },
-                                ..default()
-                            },
-                            ExampleLabel { entity },
-                        ))
-                        .with_children(|parent| {
-                            let label = match &edge.edge_type {
-                                EdgeType::Unspecified => format!("Connection"),
-                                EdgeType::Named(name) => name.clone(),
-                            };
-                            parent.spawn(
-                                TextBundle::from_section(label, label_text_style.clone())
-                                    .with_style(Style {
-                                        position_type: PositionType::Absolute,
-                                        bottom: Val::ZERO,
-                                        ..default()
-                                    })
-                                    .with_no_wrap(),
-                            );
-                        });
-                }
-            }
         }
     }
 }
@@ -274,29 +72,100 @@ fn handle_add_graph_nodes_edges_event(
     mut ev: EventReader<AddGraphNodesEdges>,
     mut ev2: EventWriter<AddGraphIdentifiers>,
     mut graph: ResMut<Graph>,
+    mut commands: Commands,
+    assets: Res<MyAssets>,
+    query: Query<(Entity, &GraphNode), With<GraphNode>>,
 ) {
     for data in ev.read() {
+        let mut node_entities: HashMap<String, Entity> = HashMap::new();
+        let mut new_nodes: Vec<crate::resources::Node> = vec![];
+        let mut new_edges: Vec<crate::resources::Edge> = vec![];
+        let mut new_keys: Vec<String>;
+
         for node in &data.nodes {
-            if !graph.nodes.iter().any(|x| x.id == node.id) {
-                graph.nodes.push(node.clone());
+            println!("node id {:?}", node.id);
+            if !graph.nodes.iter().any(|x| x.id == node.id)
+                && !new_nodes.iter().any(|x| x.id == node.id)
+            {
+                new_nodes.push(node.clone());
+                let id = commands
+                    .spawn((
+                        MaterialMeshBundle {
+                            mesh: assets.identifier_mesh_handle.clone(),
+                            material: assets.identifier_material_handle.clone(),
+                            ..Default::default()
+                        },
+                        GraphNode {
+                            id: node.id.clone(),
+                        },
+                    ))
+                    .id();
+                node_entities.insert(node.id.clone(), id);
             }
         }
         for edge in &data.edges {
-            if !graph.edges.iter().any(|x| x.id == edge.id) {
-                graph.edges.push(edge.clone());
+            println!("edge from {:?} to {:?}", edge.from, edge.to);
+            if !graph.edges.iter().any(|x| x.id == edge.id)
+                && !new_edges.iter().any(|x| x.id == edge.id)
+            {
+                new_edges.push(edge.clone());
+
+                let local_source = node_entities.get(&edge.from).cloned();
+                let local_target = node_entities.get(&edge.to).cloned();
+
+                let source = local_source.or_else(|| {
+                    query.iter().find_map(|(entity, identifier)| {
+                        if identifier.id == edge.from {
+                            Some(entity)
+                        } else {
+                            None
+                        }
+                    })
+                });
+
+                let target = local_target.or_else(|| {
+                    query.iter().find_map(|(entity, identifier)| {
+                        if identifier.id == edge.to {
+                            Some(entity)
+                        } else {
+                            None
+                        }
+                    })
+                });
+
+                if let (Some(source), Some(target)) = (source, target) {
+                    commands.spawn((
+                        MaterialMeshBundle {
+                            mesh: assets.connection_mesh_handle.clone(),
+                            material: assets.connection_material_handle.clone(),
+                            ..Default::default()
+                        },
+                        GraphEdge {
+                            id: edge.id.clone(),
+                            source,
+                            target,
+                        },
+                    ));
+                }
             }
         }
-        graph.keys = graph.edges.iter().fold(vec![], |mut acc, edge| {
-            if !acc.contains(&edge.from) {
+
+        new_keys = new_edges.iter().fold(vec![], |mut acc, edge| {
+            if !acc.contains(&edge.from) && !graph.keys.contains(&edge.from) {
                 acc.push(edge.from.clone());
             }
-            if !acc.contains(&edge.to) {
+            if !acc.contains(&edge.to) && !graph.keys.contains(&edge.to) {
                 acc.push(edge.to.clone());
             }
             acc
         });
-        let edges: Vec<(usize, usize)> = graph
-            .edges
+        println!("{:?}", new_keys);
+
+        graph.nodes.extend(new_nodes);
+        graph.edges.extend(new_edges.clone());
+        graph.keys.extend(new_keys.clone());
+
+        let edges: Vec<(usize, usize)> = new_edges
             .iter()
             .map(|edge| {
                 (
@@ -306,8 +175,7 @@ fn handle_add_graph_nodes_edges_event(
             })
             .collect();
 
-        let nodes = graph
-            .keys
+        let nodes = new_keys
             .iter()
             .map(|_| forceatlas2::Node {
                 pos: random_point_on_circle_surface(2.0),
@@ -317,6 +185,9 @@ fn handle_add_graph_nodes_edges_event(
                 mass: 1.0,
             })
             .collect::<Vec<_>>();
+
+        println!("nodes {:?}", nodes.len());
+        println!("edges {:?}", edges.len());
         graph.layout.add_nodes(&edges, &nodes, None);
         ev2.send(AddGraphIdentifiers);
     }
