@@ -28,7 +28,7 @@ impl Default for Graph {
                     kg: 0.5,
                     lin_log: false,
                     prevent_overlapping: None,
-                    speed: 0.01,
+                    speed: 0.05,
                     strong_gravity: true,
                 },
             ),
