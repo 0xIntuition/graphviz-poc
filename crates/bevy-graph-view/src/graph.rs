@@ -2,16 +2,12 @@ use crate::assets::*;
 use crate::components::*;
 use crate::events::*;
 use crate::resources::*;
-use crate::utils::normalize;
+use crate::utils::random_point_on_circle_surface;
 use crate::utils::random_point_on_sphere_surface;
 use bevy::prelude::*;
 use bevy_mod_picking::prelude::*;
 use bevy_mod_picking::PickableBundle;
-use forceatlas2::{Layout, Settings};
-use graph::page_rank::page_rank;
-use graph::page_rank::PageRankConfig;
-use graph::prelude::DirectedCsrGraph;
-use graph::prelude::GraphBuilder;
+use forceatlas2::Settings;
 use std::collections::HashMap;
 
 pub struct GraphPlugin;
@@ -24,6 +20,8 @@ impl Plugin for GraphPlugin {
             .add_systems(Update, update_graph_edge_transforms)
             .add_systems(Update, update_identifiers.before(update_labels))
             // .add_systems(Update, update_graph_node_transforms);
+            .add_systems(Update, handle_add_graph_nodes_edges_event)
+            .add_systems(Update, handle_layout_settings_event)
             .add_systems(Update, update_layout);
     }
 }
@@ -254,20 +252,41 @@ fn update_identifiers(
     }
 }
 
-fn update_layout(
-    mut layout: Local<Option<Layout<f32, 3>>>,
-    mut keys: Local<Vec<String>>,
-    mut layout_type: Local<LayoutType>,
-    mut cloned_ranks: Local<Vec<f32>>,
-    configuration: Res<Configuration>,
-    mut commands: Commands,
-    mut ev: EventReader<LayoutEvent>,
-    identifier_query: Query<(Entity, &Transform, &GraphNode), With<GraphNode>>,
-    graph: Res<Graph>,
+fn handle_layout_settings_event(
+    mut ev: EventReader<LayoutSettingsEvent>,
+    mut graph: ResMut<Graph>,
 ) {
     for settings in ev.read() {
-        *layout_type = settings.layout_type;
-        *keys = graph.edges.iter().fold(vec![], |mut acc, edge| {
+        graph.layout.set_settings(Settings {
+            theta: 0.5,
+            ka: settings.attraction,
+            kr: settings.repulsion,
+            kg: settings.gravity,
+            lin_log: false,
+            prevent_overlapping: None,
+            speed: settings.speed,
+            strong_gravity: true,
+        });
+    }
+}
+
+fn handle_add_graph_nodes_edges_event(
+    mut ev: EventReader<AddGraphNodesEdges>,
+    mut ev2: EventWriter<AddGraphIdentifiers>,
+    mut graph: ResMut<Graph>,
+) {
+    for data in ev.read() {
+        for node in &data.nodes {
+            if !graph.nodes.iter().any(|x| x.id == node.id) {
+                graph.nodes.push(node.clone());
+            }
+        }
+        for edge in &data.edges {
+            if !graph.edges.iter().any(|x| x.id == edge.id) {
+                graph.edges.push(edge.clone());
+            }
+        }
+        graph.keys = graph.edges.iter().fold(vec![], |mut acc, edge| {
             if !acc.contains(&edge.from) {
                 acc.push(edge.from.clone());
             }
@@ -281,160 +300,56 @@ fn update_layout(
             .iter()
             .map(|edge| {
                 (
-                    keys.iter().position(|x| *x == edge.from).unwrap(),
-                    keys.iter().position(|x| *x == edge.to).unwrap(),
+                    graph.keys.iter().position(|x| *x == edge.from).unwrap(),
+                    graph.keys.iter().position(|x| *x == edge.to).unwrap(),
                 )
             })
             .collect();
 
-        let directed_graph: DirectedCsrGraph<usize> =
-            GraphBuilder::new().edges(edges.clone()).build();
-
-        let (ranks, _, _) = page_rank(
-            &directed_graph,
-            PageRankConfig {
-                max_iterations: 20,
-                tolerance: 1.0E-4f64,
-                damping_factor: 0.85,
-            },
-        );
-        *cloned_ranks = ranks.clone();
-
-        normalize(&mut cloned_ranks);
-
-        // println!("nodes {:?}", keys);
-        // println!("edges {:?}", edges);
-        // println!("ranks {:?}", ranks);
-        // println!("normal {:?}", cloned_ranks);
-        let edge_count = edges.len();
-        let weights = Some((0..edge_count).map(|_| 1.0).collect::<Vec<_>>());
-        // let weights = Some(cloned_ranks.clone());
-
-        let masses_sizes = cloned_ranks
+        let nodes = graph
+            .keys
             .iter()
-            .map(|rank| (1.0, 1.0))
+            .map(|_| forceatlas2::Node {
+                pos: random_point_on_circle_surface(2.0),
+                speed: forceatlas2::Vec2::new(0.0, 0.0),
+                old_speed: forceatlas2::Vec2::new(0.0, 0.0),
+                size: 1.0,
+                mass: 1.0,
+            })
             .collect::<Vec<_>>();
-        *layout = Some(Layout::<f32, 3>::from_graph_with_masses(
-            edges,
-            masses_sizes,
-            weights,
-            Settings {
-                theta: 0.5,
-                ka: settings.atlas_settings.ka,
-                kr: settings.atlas_settings.kr,
-                kg: settings.atlas_settings.kg,
-
-                lin_log: false,
-                prevent_overlapping: None,
-                speed: settings.speed,
-                strong_gravity: true,
-            },
-        ));
-    }
-
-    match *layout {
-        Some(ref mut layout) => {
-            for _ in 0..5 {
-                layout.iteration();
-            }
-            let max_distance = layout
-                .nodes
-                .iter()
-                .map(|node| {
-                    (node.pos.x().powi(2) + node.pos.y().powi(2) + node.pos.z().powi(2)).sqrt()
-                })
-                .fold(0.0, f32::max);
-            let scale = configuration.container_size / max_distance;
-
-            for (index, node) in layout.nodes.iter().enumerate() {
-                let x = node.pos.x() * scale;
-                let y = node.pos.y() * scale;
-                let z = match *layout_type {
-                    LayoutType::Flat => 0.0,
-                    LayoutType::Sphere => node.pos.z() * scale,
-                };
-
-                let id = keys[index].clone();
-                if let Some((entity, transform, _)) = identifier_query
-                    .iter()
-                    .find(|(_, _, identifier)| identifier.id == id)
-                {
-                    commands.entity(entity).insert(
-                        Transform::from_xyz(x, y, z).with_scale(Vec3::ONE),
-                        // .with_scale(Vec3::ONE * cloned_ranks[index] * 1.1 + 0.5),
-                    );
-                }
-            }
-        }
-        None => {}
+        graph.layout.add_nodes(&edges, &nodes, None);
+        ev2.send(AddGraphIdentifiers);
     }
 }
 
-fn update_graph_node_transforms(
-    mut node_query: Query<
-        (Entity, &mut Transform, &GraphNode),
-        (With<GraphNode>, Without<GraphEdge>),
-    >,
-    mut edge_query: Query<(&mut Transform, &GraphEdge), (With<GraphEdge>, Without<GraphNode>)>,
+fn update_layout(
     configuration: Res<Configuration>,
+    mut commands: Commands,
+    query: Query<(Entity, &GraphNode), With<GraphNode>>,
+    mut graph: ResMut<Graph>,
 ) {
-    const MAX_DISTANCE: f32 = 5.0;
-    let mut combinations = node_query.iter_combinations_mut();
-    while let Some([mut node1, mut node2]) = combinations.fetch_next() {
-        //apply repulsion
-        let distance = node1.1.translation.distance(node2.1.translation);
-
-        // if distance > MAX_DISTANCE {
-        //     continue;
-        // }
-        let direction = node1.1.translation - node2.1.translation;
-
-        // gravity to the center
-        let center = Vec3::ZERO;
-        let center_force1 = (center - node1.1.translation).normalize() * 0.01;
-        let center_force2 = (center - node2.1.translation).normalize() * 0.01;
-        node1.1.translation += center_force1;
-        node2.1.translation += center_force2;
-
-        let force = direction.normalize() * 0.1 / distance;
-
-        node1.1.translation += force;
-        node2.1.translation -= force;
-
-        node1.1.translation = node1.1.translation.clamp(
-            Vec3::NEG_ONE * configuration.container_size,
-            Vec3::ONE * configuration.container_size,
-        );
-
-        node2.1.translation = node2.1.translation.clamp(
-            Vec3::NEG_ONE * configuration.container_size,
-            Vec3::ONE * configuration.container_size,
-        );
+    for _ in 0..5 {
+        graph.layout.iteration();
     }
+    let zero = forceatlas2::Vec2::new(0.0, 0.0);
+    let max_distance = graph
+        .layout
+        .nodes
+        .iter()
+        .map(|node| node.pos.distance(zero))
+        .fold(0.0, f32::max);
+    let scale = configuration.container_size / max_distance;
 
-    const MIN_DISTANCE: f32 = 0.3;
-    for (mut edge_transform, graph_edge) in edge_query.iter_mut() {
-        let [mut source, mut target] = node_query
-            .get_many_mut([graph_edge.source, graph_edge.target])
-            .unwrap();
-
-        //apply attraction
-        let distance = source.1.translation.distance(target.1.translation);
-        if distance > MIN_DISTANCE {
-            let direction = target.1.translation - source.1.translation;
-            let force = direction.normalize() * 0.1 * (distance);
-            source.1.translation += force;
-            target.1.translation -= force;
-
-            source.1.translation = source.1.translation.clamp(
-                Vec3::NEG_ONE * configuration.container_size,
-                Vec3::ONE * configuration.container_size,
-            );
-
-            target.1.translation = target.1.translation.clamp(
-                Vec3::NEG_ONE * configuration.container_size,
-                Vec3::ONE * configuration.container_size,
-            );
+    for (index, node) in graph.layout.nodes.iter().enumerate() {
+        let scaled_pos = node.pos * scale;
+        let x = scaled_pos.x();
+        let y = scaled_pos.y();
+        let z = 0.0;
+        let id = graph.keys[index].clone();
+        if let Some((entity, _)) = query.iter().find(|(_, identifier)| identifier.id == id) {
+            commands
+                .entity(entity)
+                .insert(Transform::from_xyz(x, y, z).with_scale(Vec3::ONE));
         }
     }
 }
