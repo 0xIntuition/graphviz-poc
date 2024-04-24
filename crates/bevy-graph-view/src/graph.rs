@@ -80,10 +80,9 @@ fn handle_add_graph_nodes_edges_event(
         let mut node_entities: HashMap<String, Entity> = HashMap::new();
         let mut new_nodes: Vec<crate::resources::Node> = vec![];
         let mut new_edges: Vec<crate::resources::Edge> = vec![];
-        let mut new_keys: Vec<String>;
+        let new_keys: Vec<String>;
 
         for node in &data.nodes {
-            println!("node id {:?}", node.id);
             if !graph.nodes.iter().any(|x| x.id == node.id)
                 && !new_nodes.iter().any(|x| x.id == node.id)
             {
@@ -104,7 +103,6 @@ fn handle_add_graph_nodes_edges_event(
             }
         }
         for edge in &data.edges {
-            println!("edge from {:?} to {:?}", edge.from, edge.to);
             if !graph.edges.iter().any(|x| x.id == edge.id)
                 && !new_edges.iter().any(|x| x.id == edge.id)
             {
@@ -159,7 +157,6 @@ fn handle_add_graph_nodes_edges_event(
             }
             acc
         });
-        println!("{:?}", new_keys);
 
         graph.nodes.extend(new_nodes);
         graph.edges.extend(new_edges.clone());
@@ -186,8 +183,6 @@ fn handle_add_graph_nodes_edges_event(
             })
             .collect::<Vec<_>>();
 
-        println!("nodes {:?}", nodes.len());
-        println!("edges {:?}", edges.len());
         graph.layout.add_nodes(&edges, &nodes, None);
         ev2.send(AddGraphIdentifiers);
     }
