@@ -19,19 +19,16 @@ impl Default for Graph {
             keys: Vec::new(),
             selected_nodes: Vec::new(),
             selected_edges: Vec::new(),
-            layout: Layout::<f32, 2>::empty(
-                false,
-                Settings {
-                    theta: 0.5,
-                    ka: 0.5,
-                    kr: 0.1,
-                    kg: 0.9,
-                    lin_log: false,
-                    prevent_overlapping: None,
-                    speed: 0.05,
-                    strong_gravity: true,
-                },
-            ),
+            layout: Layout::<f32, 2>::empty(Settings {
+                theta: 0.5,
+                ka: 0.5,
+                kr: 0.1,
+                kg: 0.9,
+                lin_log: false,
+                prevent_overlapping: None,
+                speed: 0.05,
+                strong_gravity: true,
+            }),
         }
     }
 }

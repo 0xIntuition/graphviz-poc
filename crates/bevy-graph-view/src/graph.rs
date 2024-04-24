@@ -162,12 +162,15 @@ fn handle_add_graph_nodes_edges_event(
         graph.edges.extend(new_edges.clone());
         graph.keys.extend(new_keys.clone());
 
-        let edges: Vec<(usize, usize)> = new_edges
+        let edges: Vec<((usize, usize), f32)> = new_edges
             .iter()
             .map(|edge| {
                 (
-                    graph.keys.iter().position(|x| *x == edge.from).unwrap(),
-                    graph.keys.iter().position(|x| *x == edge.to).unwrap(),
+                    (
+                        graph.keys.iter().position(|x| *x == edge.from).unwrap(),
+                        graph.keys.iter().position(|x| *x == edge.to).unwrap(),
+                    ),
+                    1.0,
                 )
             })
             .collect();
@@ -183,7 +186,7 @@ fn handle_add_graph_nodes_edges_event(
             })
             .collect::<Vec<_>>();
 
-        graph.layout.add_nodes(&edges, &nodes, None);
+        graph.layout.add_nodes(&edges, &nodes);
         ev2.send(AddGraphIdentifiers);
     }
 }
