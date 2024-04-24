@@ -6,9 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 rand="*"
-bevy_mod_picking = { version="0.18", features = ["bevy_egui"]}
-graph = "0.3.1"
-# forceatlas2 = "0.6.1"
 forceatlas2 = { git = "https://github.com/simonas-notcat/forceatlas2-rs.git", branch = "stable-fix" } 
 
 [dev-dependencies]
