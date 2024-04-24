@@ -24,8 +24,8 @@ impl Default for Graph {
                 Settings {
                     theta: 0.5,
                     ka: 0.5,
-                    kr: 0.5,
-                    kg: 0.5,
+                    kr: 0.1,
+                    kg: 0.9,
                     lin_log: false,
                     prevent_overlapping: None,
                     speed: 0.05,

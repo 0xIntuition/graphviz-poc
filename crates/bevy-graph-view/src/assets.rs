@@ -46,7 +46,7 @@ fn setup(
         half_height: 0.5,
     }));
     my_assets.connection_material_handle = color_materials.add(StandardMaterial {
-        emissive: Color::rgb_linear(900.0, 900.0, 900.0),
+        emissive: Color::rgb_linear(100.0, 100.0, 100.0),
         ..Default::default()
     });
 }
