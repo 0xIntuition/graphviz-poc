@@ -8,7 +8,8 @@ edition = "2021"
 rand="*"
 bevy_mod_picking = { version="0.18", features = ["bevy_egui"]}
 graph = "0.3.1"
-forceatlas2 = { path = "../../../../simonas-notcat/forceatlas2-rs" } 
+# forceatlas2 = "0.6.1"
+forceatlas2 = { git = "https://github.com/simonas-notcat/forceatlas2-rs.git", branch = "stable-fix" } 
 
 [dev-dependencies]
 bevy = "0.13.2"
@@ -29,3 +30,11 @@ features = [
   "tonemapping_luts",   # Support different camera Tonemapping modes (enables KTX2+zstd)
   "webgl2",                # Web: use WebGL2 instead of WebGPU
 ]
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+incremental = false
+debug = false
+
