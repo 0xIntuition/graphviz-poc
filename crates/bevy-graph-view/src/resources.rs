@@ -21,12 +21,12 @@ impl Default for Graph {
             selected_edges: Vec::new(),
             layout: Layout::<f32, 2>::empty(Settings {
                 theta: 0.5,
-                ka: 0.5,
-                kr: 0.1,
-                kg: 0.9,
+                ka: 0.3,
+                kr: 0.7,
+                kg: 0.6,
                 lin_log: false,
                 prevent_overlapping: None,
-                speed: 0.05,
+                speed: 0.35,
                 strong_gravity: true,
             }),
         }
