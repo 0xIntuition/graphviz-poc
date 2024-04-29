@@ -197,9 +197,10 @@ fn update_layout(
     query: Query<(Entity, &GraphNode), With<GraphNode>>,
     mut graph: ResMut<Graph>,
 ) {
-    for _ in 0..5 {
-        graph.layout.iteration();
-    }
+    // for _ in 0..5 {
+    //     graph.layout.iteration();
+    // }
+    graph.layout.iteration();
     let zero = forceatlas2::Vec2::new(0.0, 0.0);
     let max_distance = graph
         .layout

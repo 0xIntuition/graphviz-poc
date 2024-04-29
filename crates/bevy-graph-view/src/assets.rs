@@ -26,7 +26,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut color_materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    my_assets.identifier_mesh_handle = meshes.add(Mesh::try_from(Sphere { radius: 0.02 }).unwrap());
+    my_assets.identifier_mesh_handle = meshes.add(Mesh::try_from(Sphere { radius: 0.03 }).unwrap());
     my_assets.identifier_connected_material_handle = color_materials.add(StandardMaterial {
         base_color: Color::rgb(0.1, 0.1, 0.9),
         ..Default::default()
@@ -42,11 +42,11 @@ fn setup(
     });
 
     my_assets.connection_mesh_handle = meshes.add(Mesh::from(Cylinder {
-        radius: 0.001,
+        radius: 0.003,
         half_height: 0.5,
     }));
     my_assets.connection_material_handle = color_materials.add(StandardMaterial {
-        emissive: Color::rgb_linear(100.0, 100.0, 100.0),
+        emissive: Color::rgb_linear(200.0, 200.0, 200.0),
         ..Default::default()
     });
 }
