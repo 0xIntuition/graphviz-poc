@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use forceatlas2::{Layout, Settings};
+use serde::Deserialize;
 
 #[derive(Resource)]
 pub struct Graph {
@@ -33,7 +34,7 @@ impl Default for Graph {
     }
 }
 
-#[derive(Resource, Default, Clone)]
+#[derive(Resource, Default, Clone, Deserialize, Debug)]
 pub struct Node {
     pub id: String,
     pub label: String,
@@ -41,7 +42,7 @@ pub struct Node {
     // pub page_rank: u32,
 }
 
-#[derive(Resource, Default, Clone)]
+#[derive(Resource, Default, Clone, Deserialize, Debug)]
 pub struct Edge {
     pub id: String,
     pub from: String,
@@ -49,7 +50,7 @@ pub struct Edge {
     pub edge_type: EdgeType,
 }
 
-#[derive(Resource, Default, Clone)]
+#[derive(Resource, Default, Clone, Deserialize, Debug)]
 pub enum EdgeType {
     #[default]
     Unspecified,

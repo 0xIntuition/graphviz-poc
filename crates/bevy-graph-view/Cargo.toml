@@ -12,7 +12,6 @@ forceatlas2 = { git = "https://github.com/simonas-notcat/forceatlas2-rs.git", br
 bevy = "0.13.2"
 bevy_panorbit_camera = { version="0.17", features = ["bevy_egui"] }
 bevy_egui = { version = "0.25", default-features = false, features = ["render", "default_fonts"] }
-
 [dependencies.bevy]
 version = "0.13.2"
 default-features = false
