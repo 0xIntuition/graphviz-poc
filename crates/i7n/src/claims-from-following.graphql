@@ -1,0 +1,25 @@
+query ClaimsFromFollowing($address: String!) {
+  claims_from_following(args: { address: $address }) {
+    shares
+    triple {
+      id
+      label
+      subject {
+        id
+        label
+      }
+      predicate {
+        id
+        label
+      }
+      object {
+        id
+        label
+      }
+    }
+    account {
+      id
+      label
+    }
+  }
+}
