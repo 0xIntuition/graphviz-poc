@@ -324,6 +324,7 @@ dependencies = [
  "bevy",
  "forceatlas2",
  "rand",
+ "serde",
 ]
 
 [[package]]
