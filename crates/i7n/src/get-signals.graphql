@@ -1,46 +1,35 @@
-query GetSignals($after: String) {
-  signals(
-    after: $after
-    orderBy: "blockTimestamp"
-    orderDirection: "asc"
-    limit: 10
-  ) {
-    items {
+query GetSignals {
+  signals(order_by: { blockTimestamp: asc }, limit: 100) {
+    id
+    account {
       id
-      account {
-        id
-        label
-        image
-      }
-      delta
-      blockTimestamp
-      atom {
+      label
+      image
+    }
+    delta
+    blockTimestamp
+    atom {
+      id
+      emoji
+      label
+    }
+    triple {
+      id
+      subject {
         id
         emoji
         label
       }
-      triple {
+      predicate {
         id
-        subject {
-          id
-          emoji
-          label
-        }
-        predicate {
-          id
-          emoji
-          label
-        }
-        object {
-          id
-          emoji
-          label
-        }
+        emoji
+        label
       }
-    }
-    pageInfo {
-      endCursor
-      hasNextPage
+      object {
+        id
+        emoji
+        label
+      }
     }
   }
 }

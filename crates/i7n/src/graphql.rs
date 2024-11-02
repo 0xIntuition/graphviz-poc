@@ -1,87 +1,118 @@
 use bevy::prelude::*;
 use bevy_graph_view::{events::AddGraphNodesEdges, resources::{Node, Edge, EdgeType}};
-use reqwest::Client;
-use serde_json::Value;
+use bevy_mod_reqwest::*;
+use bevy_eventlistener::callbacks::ListenerInput;
 
 pub struct GraphQLPlugin;
 
 impl Plugin for GraphQLPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GraphQLClient>()
-            .add_systems(Startup, setup_graphql_client)
-            .add_systems(Update, fetch_and_update_graph);
+        app.add_plugins(ReqwestPlugin::default())
+            .add_event::<GraphQLResponse>()
+            .add_systems(Update, handle_graphql_response)
+            .add_systems(Startup, send_graphql_request);
     }
 }
 
-#[derive(Resource)]
-struct GraphQLClient(Client);
+#[derive(serde::Deserialize, Debug, Event)]
+struct GraphQLResponse {
+    data: GraphQLData,
+}
 
-impl Default for GraphQLClient {
-    fn default() -> Self {
-        GraphQLClient(Client::new())
+#[derive(serde::Deserialize, Debug)]
+struct GraphQLData {
+    signals: Vec<Signal>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct Signal {
+    atom: Option<Atom>,
+    triple: Option<Triple>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct Atom {
+    id: String,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct Triple {
+    id: String,
+    subject: Entity,
+    predicate: Entity,
+    object: Entity,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct Entity {
+    id: String,
+}
+
+impl From<ListenerInput<ReqResponse>> for GraphQLResponse {
+    fn from(value: ListenerInput<ReqResponse>) -> Self {
+        value.deserialize_json().unwrap()
     }
 }
 
-fn setup_graphql_client(mut commands: Commands) {
-    commands.insert_resource(GraphQLClient::default());
+fn send_graphql_request(mut bevyreq: BevyReqwest) {
+    let query = include_str!("get-signals.graphql");
+    let url: reqwest::Url = "https://api.i7n.app/v1/graphql".try_into().unwrap();
+    info!("sending graphql request to {}", url);
+    let reqwest = bevyreq
+        .client()
+        .post(url)
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": {}
+        }))
+        .build()
+        .unwrap();
+    
+    bevyreq.send(reqwest, On::send_event::<GraphQLResponse>());
 }
 
-fn fetch_and_update_graph(
-    client: Res<GraphQLClient>,
+fn handle_graphql_response(
+    mut events: EventReader<GraphQLResponse>,
     mut ev_graph: EventWriter<AddGraphNodesEdges>,
 ) {
-    let query = include_str!("get-signals.graphql");
-    let url = "https://i7n.app/graphql";
-
-    tokio::spawn(async move {
-        let response = client.0.post(url)
-            .json(&serde_json::json!({
-                "query": query,
-                "variables": {"after": null}
-            }))
-            .send()
-            .await
-            .unwrap()
-            .json::<Value>()
-            .await
-            .unwrap();
-
-        let signals = response["data"]["signals"]["items"].as_array().unwrap();
+    for ev in events.read() {
+    info!("got graphql response");
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
 
-        for signal in signals {
-            let atom_id = signal["atom"]["id"].as_str().unwrap();
-            let triple_id = signal["triple"]["id"].as_str().unwrap();
-            let subject_id = signal["triple"]["subject"]["id"].as_str().unwrap();
-            let predicate_id = signal["triple"]["predicate"]["id"].as_str().unwrap();
-            let object_id = signal["triple"]["object"]["id"].as_str().unwrap();
+        for signal in &ev.data.signals {
+            // Check if atom is present
+            if let Some(ref atom) = signal.atom {
+                nodes.push(Node {
+                    id: atom.id.clone(),
+                    label: format!("Atom {}", atom.id),
+                    image: None,
+                });
+            }
 
-            nodes.push(Node {
-                id: atom_id.to_string(),
-                label: format!("Atom {}", atom_id),
-                image: None,
-            });
-            nodes.push(Node {
-                id: triple_id.to_string(),
-                label: format!("Triple {}", triple_id),
-                image: None,
-            });
+            // Check if triple is present
+            if let Some(ref triple) = signal.triple {
+                nodes.push(Node {
+                    id: triple.id.clone(),
+                    label: format!("Triple {}", triple.id),
+                    image: None,
+                });
 
-            edges.push(Edge {
-                id: format!("{}-{}", subject_id, predicate_id),
-                from: subject_id.to_string(),
-                to: predicate_id.to_string(),
-                edge_type: EdgeType::Named("subject_predicate".to_string()),
-            });
-            edges.push(Edge {
-                id: format!("{}-{}", predicate_id, object_id),
-                from: predicate_id.to_string(),
-                to: object_id.to_string(),
-                edge_type: EdgeType::Named("predicate_object".to_string()),
-            });
+                edges.push(Edge {
+                    id: format!("{}-{}", triple.subject.id, triple.predicate.id),
+                    from: triple.subject.id.clone(),
+                    to: triple.predicate.id.clone(),
+                    edge_type: EdgeType::Named("subject_predicate".to_string()),
+                });
+                edges.push(Edge {
+                    id: format!("{}-{}", triple.predicate.id, triple.object.id),
+                    from: triple.predicate.id.clone(),
+                    to: triple.object.id.clone(),
+                    edge_type: EdgeType::Named("predicate_object".to_string()),
+                });
+            }
         }
 
         ev_graph.send(AddGraphNodesEdges { nodes, edges });
-    });
+    }
 }
