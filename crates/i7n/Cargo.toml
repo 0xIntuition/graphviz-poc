@@ -1,18 +1,23 @@
 [package]
-name = "bevy-graph-view"
+name = "i7n"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 rand="*"
 forceatlas2 = { git = "https://github.com/simonas-notcat/forceatlas2-rs.git", branch = "stable-fix" } 
-serde = { version = "1.0", features = ["derive"] }
-
-[dev-dependencies]
-bevy = "0.13.2"
+bevy-graph-view = { path = "../bevy-graph-view/" }
 bevy_panorbit_camera = { version="0.17", features = ["bevy_egui"] }
 bevy_egui = { version = "0.25", default-features = false, features = ["render", "default_fonts"] }
+bevy_mod_reqwest = { git = "https://github.com/simonas-notcat/bevy_mod_reqwest.git", branch = "fix-macos"}
+serde = "1.0.197"
+serde_json = "1.0.114"
+egui_extras = { version = "0.26.2", features = [ "all_loaders" ] }
+image = { version = "0.24", features = ["jpeg", "png"] }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1.0", features = ["full"] }
+
 [dependencies.bevy]
 version = "0.13.2"
 default-features = false
@@ -32,6 +37,5 @@ features = [
 lto = true
 opt-level = 3
 codegen-units = 1
-incremental = false
+incremental = true
 debug = false
-

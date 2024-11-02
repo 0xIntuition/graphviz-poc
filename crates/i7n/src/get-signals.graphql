@@ -1,0 +1,46 @@
+query GetSignals($after: String) {
+  signals(
+    after: $after
+    orderBy: "blockTimestamp"
+    orderDirection: "asc"
+    limit: 10
+  ) {
+    items {
+      id
+      account {
+        id
+        label
+        image
+      }
+      delta
+      blockTimestamp
+      atom {
+        id
+        emoji
+        label
+      }
+      triple {
+        id
+        subject {
+          id
+          emoji
+          label
+        }
+        predicate {
+          id
+          emoji
+          label
+        }
+        object {
+          id
+          emoji
+          label
+        }
+      }
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+  }
+}
