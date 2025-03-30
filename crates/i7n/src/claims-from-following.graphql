@@ -3,7 +3,6 @@ query ClaimsFromFollowing($address: String!) {
     shares
     triple {
       id
-      label
       subject {
         id
         label

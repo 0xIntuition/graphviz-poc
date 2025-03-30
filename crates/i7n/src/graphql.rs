@@ -88,7 +88,6 @@ struct Account {
 #[derive(serde::Deserialize, Debug, Clone)]
 struct Triple {
     id: String,
-    label: String,
     subject: Atom,
     predicate: Atom,
     object: Atom,
@@ -108,7 +107,9 @@ impl From<ListenerInput<ReqResponse>> for GraphQLResponse {
 
 fn send_graphql_request(mut bevyreq: BevyReqwest) {
     let query = include_str!("claims-from-following.graphql");
-    let url: reqwest::Url = "https://api.i7n.app/v1/graphql".try_into().unwrap();
+    let url: reqwest::Url = "https://prod.base.intuition-api.com/v1/graphql"
+        .try_into()
+        .unwrap();
     info!("sending graphql request to {}", url);
     let reqwest = bevyreq
         .client()
@@ -145,7 +146,7 @@ fn handle_graphql_response(
             // Triple node
             nodes.push(Node {
                 id: claim.triple.id.clone(),
-                label: claim.triple.label.clone(),
+                label: claim.triple.id.clone(),
                 image: None,
             });
 
