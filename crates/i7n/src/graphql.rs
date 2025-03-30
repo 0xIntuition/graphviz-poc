@@ -13,12 +13,35 @@ impl Plugin for GraphQLPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ReqwestPlugin::default())
             .add_event::<GraphQLResponse>()
+            .init_resource::<GraphQLData>()
             .add_systems(Update, handle_graphql_response)
+            .add_systems(Update, update_graph_data)
             .add_systems(Update, intuition_ui);
     }
 }
 
-pub fn intuition_ui(mut egui_contexts: EguiContexts, bevyreq: BevyReqwest) {
+impl Default for GraphQLData {
+    fn default() -> Self {
+        Self {
+            claims_from_following: Vec::new(),
+        }
+    }
+}
+
+fn update_graph_data(
+    mut events: EventReader<GraphQLResponse>,
+    mut graph_data: ResMut<GraphQLData>,
+) {
+    for ev in events.read() {
+        *graph_data = ev.data.clone();
+    }
+}
+
+pub fn intuition_ui(
+    mut egui_contexts: EguiContexts,
+    bevyreq: BevyReqwest,
+    graph_data: Res<GraphQLData>,
+) {
     let egui_context: &mut egui::Context = egui_contexts.ctx_mut();
 
     egui::Window::new("Intuition")
@@ -26,6 +49,16 @@ pub fn intuition_ui(mut egui_contexts: EguiContexts, bevyreq: BevyReqwest) {
         .show(egui_context, |ui| {
             if ui.button("Fetch claims").clicked() {
                 send_graphql_request(bevyreq);
+            }
+
+            for claim in &graph_data.claims_from_following {
+                ui.label(format!(
+                    "{:?}: {:?} -> {:?} -> {:?}",
+                    claim.account.label,
+                    claim.triple.subject.label,
+                    claim.triple.predicate.label,
+                    claim.triple.object.label
+                ));
             }
         });
 }
@@ -35,24 +68,24 @@ struct GraphQLResponse {
     data: GraphQLData,
 }
 
-#[derive(serde::Deserialize, Debug)]
-struct GraphQLData {
+#[derive(serde::Deserialize, Debug, Resource, Clone)]
+pub struct GraphQLData {
     claims_from_following: Vec<Claim>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 struct Claim {
     account: Account,
     triple: Triple,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 struct Account {
     id: String,
     label: String,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 struct Triple {
     id: String,
     label: String,
@@ -61,7 +94,7 @@ struct Triple {
     object: Atom,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 struct Atom {
     id: String,
     label: String,

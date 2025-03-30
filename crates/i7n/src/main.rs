@@ -50,9 +50,9 @@ impl Default for LayoutSettings {
     fn default() -> Self {
         Self {
             gravity: 0.6,
-            attraction: 0.3,
-            repulsion: 0.7,
-            speed: 0.35,
+            attraction: 0.17,
+            repulsion: 0.85,
+            speed: 0.21,
         }
     }
 }
