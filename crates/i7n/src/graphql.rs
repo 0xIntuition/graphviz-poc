@@ -17,12 +17,19 @@ impl Plugin for GraphQLPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ReqwestPlugin::default())
             .add_event::<GraphQLResponse>()
+            .add_event::<AccountsResponse>()
             .init_resource::<GraphQLData>()
             .init_resource::<AddressInput>()
             .add_systems(Update, handle_graphql_response)
+            .add_systems(Update, handle_accounts_response)
             .add_systems(Update, update_graph_data)
-            .add_systems(Update, intuition_ui);
+            .add_systems(Update, intuition_ui)
+            .add_systems(Startup, refresh_accounts);
     }
+}
+// setup system
+fn refresh_accounts(mut bevyreq: BevyReqwest) {
+    fetch_accounts(bevyreq);
 }
 
 impl Default for GraphQLData {
@@ -36,14 +43,43 @@ impl Default for GraphQLData {
 #[derive(Resource)]
 pub struct AddressInput {
     address: String,
+    accounts: Vec<Account>,
 }
 
 impl Default for AddressInput {
     fn default() -> Self {
         Self {
             address: "0x19711cd19e609febdbf607960220898268b7e24b".to_string(),
+            accounts: Vec::new(),
         }
     }
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct Account {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub claims_aggregate: Option<ClaimsAggregate>,
+    #[serde(default)]
+    pub signals_aggregate: Option<SignalsAggregate>,
+    #[serde(default)]
+    pub following: Option<ClaimsAggregate>,
+}
+
+#[derive(serde::Deserialize, Debug, Clone, Default)]
+pub struct ClaimsAggregate {
+    pub aggregate: Aggregate,
+}
+
+#[derive(serde::Deserialize, Debug, Clone, Default)]
+pub struct SignalsAggregate {
+    pub aggregate: Aggregate,
+}
+
+#[derive(serde::Deserialize, Debug, Clone, Default)]
+pub struct Aggregate {
+    pub count: i32,
 }
 
 fn update_graph_data(
@@ -55,9 +91,29 @@ fn update_graph_data(
     }
 }
 
+fn fetch_accounts(mut bevyreq: BevyReqwest) {
+    let query = include_str!("get-accounts.graphql");
+    let url: reqwest::Url = "https://prod.base.intuition-api.com/v1/graphql"
+        .try_into()
+        .unwrap();
+    info!("sending graphql request to {} for accounts", url);
+    let reqwest = bevyreq
+        .client()
+        .post(url)
+        .json(&serde_json::json!({
+            "query": query,
+            "variables": {"offset": 0}
+        }))
+        .build()
+        .unwrap();
+
+    bevyreq.send(reqwest, On::send_event::<AccountsResponse>());
+}
+
 pub fn intuition_ui(
     mut egui_contexts: EguiContexts,
     bevyreq: BevyReqwest,
+    bevyreq2: BevyReqwest,
     graph_data: Res<GraphQLData>,
     mut address_input: ResMut<AddressInput>,
 ) {
@@ -66,16 +122,47 @@ pub fn intuition_ui(
     egui::Window::new("Intuition")
         .resizable(true)
         .show(egui_context, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Address:");
-                ui.text_edit_singleline(&mut address_input.address);
+            let mut should_fetch_claims = false;
+            let mut should_refresh_accounts = false;
 
-                if ui.button("Fetch claims").clicked() {
-                    if !address_input.address.is_empty() {
-                        send_graphql_request(bevyreq, address_input.address.clone());
-                    }
+            ui.horizontal(|ui| {
+                ui.label("Account:");
+                let accounts = address_input.accounts.clone();
+                // find the account with the id that matches the address
+                let selected_account = accounts
+                    .iter()
+                    .find(|account| account.id == address_input.address);
+                
+                let selected_text = match &selected_account {
+                    Some(account) => account.label.clone(),
+                    None => "Fetching accounts...".to_string(),
+                };
+                
+                egui::ComboBox::from_label("")
+                    .selected_text(&selected_text)
+                    .show_ui(ui, |ui| {
+                        for account in accounts {
+                            let display_text = format!(
+                                "{} ({:?} following, {:?} signals, {:?} claims)",
+                                account.label,
+                                account.following.as_ref().map_or(0, |s| s.aggregate.count),
+                                account.signals_aggregate.as_ref().map_or(0, |s| s.aggregate.count),
+                                account.claims_aggregate.as_ref().map_or(0, |s| s.aggregate.count),
+                            );
+                            ui.selectable_value(
+                                &mut address_input.address,
+                                account.id.clone(),
+                                display_text,
+                            );
+                        }
+                    });
+
+                if ui.button("Fetch following claims").clicked() {
+                    should_fetch_claims = true;
                 }
             });
+
+
 
             let mut code = String::new();
             for claim in &graph_data.claims_from_following {
@@ -93,10 +180,17 @@ pub fn intuition_ui(
 
             ui.columns(1, |columns| {
                 ScrollArea::vertical().show(&mut columns[0], |ui| {
-                    // TODO(emilk): we can save some more CPU by caching the rendered output.
                     crate::easy_mark::easy_mark(ui, &code);
                 })
             });
+
+            if should_fetch_claims && !address_input.address.is_empty() {
+                send_graphql_request(bevyreq, address_input.address.clone());
+            }
+
+            if should_refresh_accounts {
+                fetch_accounts(bevyreq2);
+            }
         });
 }
 
@@ -115,12 +209,6 @@ struct Claim {
     account: Account,
     triple: Triple,
     shares: String,
-}
-
-#[derive(serde::Deserialize, Debug, Clone)]
-struct Account {
-    id: String,
-    label: String,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
@@ -233,5 +321,30 @@ fn handle_graphql_response(
         }
 
         ev_graph.send(AddGraphNodesEdges { nodes, edges });
+    }
+}
+
+#[derive(serde::Deserialize, Debug, Event)]
+struct AccountsResponse {
+    data: AccountsData,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+struct AccountsData {
+    accounts: Vec<Account>,
+}
+
+impl From<ListenerInput<ReqResponse>> for AccountsResponse {
+    fn from(value: ListenerInput<ReqResponse>) -> Self {
+        value.deserialize_json().unwrap()
+    }
+}
+
+fn handle_accounts_response(
+    mut events: EventReader<AccountsResponse>,
+    mut address_input: ResMut<AddressInput>,
+) {
+    for ev in events.read() {
+        address_input.accounts = ev.data.accounts.clone();
     }
 }

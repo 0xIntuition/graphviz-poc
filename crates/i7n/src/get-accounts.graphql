@@ -1,0 +1,41 @@
+query GetAccounts($offset: Int) {
+  accounts_aggregate(where: { type: { _eq: Default } }) {
+    aggregate {
+      count
+    }
+  }
+  accounts(
+    limit: 50
+    offset: $offset
+    where: { type: { _eq: Default } }
+    order_by: [{signals_aggregate:  {
+       count: desc
+    }}]
+  ) {
+    label
+    id
+    following: claims_aggregate(where:  {
+      subject_id:  {
+         _eq: 11
+      }
+       predicate_id:  {
+          _eq: 3
+       }
+    }) {
+      aggregate {
+        count
+      }
+    }
+    claims_aggregate {
+      aggregate {
+        count
+      }
+    }
+    signals_aggregate {
+      aggregate {
+        count
+      }
+    }
+
+  }
+}
