@@ -53,7 +53,7 @@ impl Default for LayoutSettings {
             gravity: 1.0,
             attraction: 0.11,
             repulsion: 1.0,
-            speed: 0.21,
+            speed: 0.57,
         }
     }
 }
