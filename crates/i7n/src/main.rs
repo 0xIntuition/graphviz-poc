@@ -1,3 +1,4 @@
+mod easy_mark;
 mod graphql;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*};
@@ -49,9 +50,9 @@ pub struct LayoutSettings {
 impl Default for LayoutSettings {
     fn default() -> Self {
         Self {
-            gravity: 0.6,
-            attraction: 0.17,
-            repulsion: 0.85,
+            gravity: 1.0,
+            attraction: 0.11,
+            repulsion: 1.0,
             speed: 0.21,
         }
     }

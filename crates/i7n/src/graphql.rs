@@ -1,11 +1,12 @@
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts};
+use bevy_egui::{egui::{self, ScrollArea}, EguiContexts};
 use bevy_eventlistener::callbacks::ListenerInput;
 use bevy_graph_view::{
     events::AddGraphNodesEdges,
     resources::{Edge, EdgeType, Node},
 };
 use bevy_mod_reqwest::*;
+
 
 pub struct GraphQLPlugin;
 
@@ -14,6 +15,7 @@ impl Plugin for GraphQLPlugin {
         app.add_plugins(ReqwestPlugin::default())
             .add_event::<GraphQLResponse>()
             .init_resource::<GraphQLData>()
+            .init_resource::<AddressInput>()
             .add_systems(Update, handle_graphql_response)
             .add_systems(Update, update_graph_data)
             .add_systems(Update, intuition_ui);
@@ -24,6 +26,19 @@ impl Default for GraphQLData {
     fn default() -> Self {
         Self {
             claims_from_following: Vec::new(),
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct AddressInput {
+    address: String,
+}
+
+impl Default for AddressInput {
+    fn default() -> Self {
+        Self {
+            address: "0x19711cd19e609febdbf607960220898268b7e24b".to_string(),
         }
     }
 }
@@ -41,25 +56,46 @@ pub fn intuition_ui(
     mut egui_contexts: EguiContexts,
     bevyreq: BevyReqwest,
     graph_data: Res<GraphQLData>,
+    mut address_input: ResMut<AddressInput>,
 ) {
     let egui_context: &mut egui::Context = egui_contexts.ctx_mut();
 
     egui::Window::new("Intuition")
         .resizable(true)
         .show(egui_context, |ui| {
-            if ui.button("Fetch claims").clicked() {
-                send_graphql_request(bevyreq);
-            }
-
+            
+            ui.horizontal(|ui| {
+                ui.label("Address:");
+                ui.text_edit_singleline(&mut address_input.address);
+                
+                if ui.button("Fetch claims").clicked() {
+                    if !address_input.address.is_empty() {
+                        send_graphql_request(bevyreq, address_input.address.clone());
+                    }
+                }
+            });
+            
+            let mut code = String::new();
             for claim in &graph_data.claims_from_following {
-                ui.label(format!(
-                    "{:?}: {:?} -> {:?} -> {:?}",
-                    claim.account.label,
+                code.push_str(&format!(
+                    "{} \n/{}/  *{}*\n${} {}$\n\n",
                     claim.triple.subject.label,
                     claim.triple.predicate.label,
-                    claim.triple.object.label
+                    claim.triple.object.label,
+                    claim.account.label,
+                    claim.shares,
                 ));
             }
+
+            ui.columns(1, |columns| {
+                
+                ScrollArea::vertical()
+                    .show(&mut columns[0], |ui| {
+                        // TODO(emilk): we can save some more CPU by caching the rendered output.
+                        crate::easy_mark::easy_mark(ui, &code);
+                    })
+            });
+
         });
 }
 
@@ -77,6 +113,7 @@ pub struct GraphQLData {
 struct Claim {
     account: Account,
     triple: Triple,
+    shares: String,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
@@ -105,20 +142,18 @@ impl From<ListenerInput<ReqResponse>> for GraphQLResponse {
     }
 }
 
-fn send_graphql_request(mut bevyreq: BevyReqwest) {
+fn send_graphql_request(mut bevyreq: BevyReqwest, address: String) {
     let query = include_str!("claims-from-following.graphql");
     let url: reqwest::Url = "https://prod.base.intuition-api.com/v1/graphql"
         .try_into()
         .unwrap();
-    info!("sending graphql request to {}", url);
+    info!("sending graphql request to {} for address {}", url, address);
     let reqwest = bevyreq
         .client()
         .post(url)
         .json(&serde_json::json!({
             "query": query,
-            "variables": {"address": "0x19711cd19e609febdbf607960220898268b7e24b"}
-            // 0x88d0af73508452c1a453356b3fac26525aec23a2
-            // 0x19711cd19e609febdbf607960220898268b7e24b
+            "variables": {"address": address}
         }))
         .build()
         .unwrap();

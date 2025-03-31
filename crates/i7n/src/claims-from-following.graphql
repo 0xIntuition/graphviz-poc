@@ -1,5 +1,9 @@
 query ClaimsFromFollowing($address: String!) {
-  claims_from_following(args: { address: $address }) {
+  claims_from_following(args: { address: $address }
+  order_by: [ {
+     shares: desc
+  }]
+  ) {
     shares
     triple {
       id
