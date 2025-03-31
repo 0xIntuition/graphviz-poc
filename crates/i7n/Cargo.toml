@@ -17,6 +17,7 @@ egui_extras = { version = "0.26.2", features = [ "all_loaders" ] }
 image = { version = "0.24", features = ["jpeg", "png"] }
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1.0", features = ["full"] }
+primitive-types = "0.13.1"
 
 [dependencies.bevy]
 version = "0.13.2"

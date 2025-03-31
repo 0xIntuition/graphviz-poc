@@ -1,12 +1,15 @@
 use bevy::prelude::*;
-use bevy_egui::{egui::{self, ScrollArea}, EguiContexts};
+use bevy_egui::{
+    egui::{self, ScrollArea},
+    EguiContexts,
+};
 use bevy_eventlistener::callbacks::ListenerInput;
 use bevy_graph_view::{
     events::AddGraphNodesEdges,
     resources::{Edge, EdgeType, Node},
 };
 use bevy_mod_reqwest::*;
-
+use primitive_types::U256;
 
 pub struct GraphQLPlugin;
 
@@ -63,39 +66,37 @@ pub fn intuition_ui(
     egui::Window::new("Intuition")
         .resizable(true)
         .show(egui_context, |ui| {
-            
             ui.horizontal(|ui| {
                 ui.label("Address:");
                 ui.text_edit_singleline(&mut address_input.address);
-                
+
                 if ui.button("Fetch claims").clicked() {
                     if !address_input.address.is_empty() {
                         send_graphql_request(bevyreq, address_input.address.clone());
                     }
                 }
             });
-            
+
             let mut code = String::new();
             for claim in &graph_data.claims_from_following {
+                let shares = U256::from_dec_str(&claim.shares).unwrap();
+                let shares_str = format!("{:.5} ETH", shares.as_u128() as f64 / 1e18);
                 code.push_str(&format!(
                     "{} \n/{}/  *{}*\n${} {}$\n\n",
                     claim.triple.subject.label,
                     claim.triple.predicate.label,
                     claim.triple.object.label,
                     claim.account.label,
-                    claim.shares,
+                    shares_str,
                 ));
             }
 
             ui.columns(1, |columns| {
-                
-                ScrollArea::vertical()
-                    .show(&mut columns[0], |ui| {
-                        // TODO(emilk): we can save some more CPU by caching the rendered output.
-                        crate::easy_mark::easy_mark(ui, &code);
-                    })
+                ScrollArea::vertical().show(&mut columns[0], |ui| {
+                    // TODO(emilk): we can save some more CPU by caching the rendered output.
+                    crate::easy_mark::easy_mark(ui, &code);
+                })
             });
-
         });
 }
 
